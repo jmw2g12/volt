@@ -1,90 +1,83 @@
 using System;
 using System.Collections;
-namespace HelloWorld
+namespace Volt
 {
+    public static class Globals
+    {
+        public static int numPlayers = 4;
+        public static int numMoves = 1;
+
+        public static String[] shootDirs = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+        public static int numShotOptions = shootDirs.Length;
+        public static String[] shootTargets = { "HEAD", "BODY", "LARM", "RARM", "LLEG", "RLEG" };
+        public static int[] targetRanks = { 5, 4, 2, 2, 3, 3 };
+        public static String[] moveDirs = { "U", "R", "D", "L" };
+        public static int numMoveOptions = moveDirs.Length;
+        public static String[] moveTargets = { "1", "2", "3", "4", "5", "6" };
+
+
+        public static int width = 9;
+        public static int height = 9;
+        public static int numHoles = 5;
+        public static int numControlPoints = 1;
+    }
+
     class Board
     {
-        // Coordinate transforms
-        Coord N;
-        Coord NE;
-        Coord E;
-        Coord SE;
-        Coord S;
-        Coord SW;
-        Coord W;
-        Coord NW;
-
-        Coord U;
-        Coord R;
-        Coord D;
-        Coord L;
-
-        Coord[] shotTransforms;
-        Coord[] moveTransforms;
-
-        int nMoves = 1;
-
-        String[] shootDirs = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-        String[] shootTargets = { "HEAD", "BODY", "LARM", "RARM", "LLEG", "RLEG" };
-        String[] moveDirs = { "U", "R", "D", "L" };
-        String[] moveTargets = { "1", "2", "3", "4", "5", "6" };
-
-        int width = 9;
-        int height = 9;
-        int numHoles = 5;
-        int numPlayers;
-
+        static ArrayList allMoves;
         Player[] players;
-        Coord[] holeLocations;
-        public Coord controlLocation;
-
-        public ArrayList allMoves = new ArrayList();
+        public Coord[] holeLocations;
+        public Coord[] controlLocations;
 
         public Board(Player[] players)
         {
             this.players = players;
-            numPlayers = players.Length;
-            holeLocations = new Coord[numHoles];
 
-            initPlayerLocations();
-            initHoleLocations();
-            setControlLocation(true);
+            InitPlayerLocations();
+            InitHoleLocations();
+            SetControlLocations(true);
 
-            genAllMoves();
-
-            N = new Coord(0, 1);
-            NE = new Coord(1, 1);
-            E = new Coord(1, 0);
-            SE = new Coord(1, -1);
-            S = new Coord(0, -1);
-            SW = new Coord(-1, -1);
-            W = new Coord(-1, 0);
-            NW = new Coord(-1, 1);
-
-            U = N;
-            R = E;
-            D = S;
-            L = W;
-
-            shotTransforms = new Coord[] { N, NE, E, SE, S, SW, W, NW };
-            moveTransforms = new Coord[] { N, E, S, W };
+            GenAllMoves();
         }
 
-        public int[] getSpaceAroundPlayer(Player player)
+        public Board Clone(){
+            Player[] clonedPlayers = Player[Globals.numPlayers];
+            for (int i = 0; i < Globals.numPlayers; i++){
+                clonedPlayers[i] = players[i].Clone();
+            }
+
+            Board clonedBoard = new Board(clonedPlayers);
+
+            Coord[] clonedHoleLocations = new Coord[Globals.numHoles];
+            for (int i = 0; i < Globals.numHoles; i++){
+                clonedHoleLocations[i] = holeLocations[i].Clone();
+            }
+            clonedBoard.holeLocations = clonedHoleLocations;
+
+            Coord[] clonedControlLocations = new Coord[Globals.numControlPoints];
+            for (int i = 0; i < Globals.numControlPoints; i++){
+                clonedControlLocations[i] = controlLocations[i].Clone();
+            }
+            clonedBoard.controlLocations = clonedControlLocations;
+
+            return clonedBoard;
+        }
+
+        public int[] GetSpaceAroundPlayer(Player player)
         {
-            int[] result = new int[moveTransforms.Length];
+            int[] result = new int[Globals.numMoveOptions];
             Coord start = player.location;
-            Coord loc;
+            Coord checkLocation;
             int idx = 0;
             int count;
-            foreach (Coord t in moveTransforms)
+            foreach (Coord transform in Coord.moveTransforms)
             {
                 count = 0;
-                loc = start.clone();
-                loc = Coord.add(loc, t);
-                while (isOnBoard(loc.x, loc.y) && !isHoleLocation(loc) && !isPlayerLocation(loc))
+                checkLocation = start.Clone();
+                checkLocation = Coord.Add(checkLocation, transform);
+                while (IsOnBoard(checkLocation) && !IsHoleLocation(checkLocation) && !IsPlayerLocation(checkLocation))
                 {
-                    loc = Coord.add(loc, t);
+                    checkLocation = Coord.Add(checkLocation, transform);
                     count++;
                 }
                 result[idx] = count;
@@ -92,25 +85,26 @@ namespace HelloWorld
             }
             return result;
         }
-        public int[] getShotsAroundPlayer(Player player)
+
+        public bool[] GetShotsAroundPlayer(Player player)
         {
-            int[] result = new int[shotTransforms.Length];
+            bool[] result = new bool[Globals.numShotOptions];
             Coord start = player.location;
-            Coord loc;
+            Coord checkLocation;
             int idx = 0;
-            int count;
-            foreach (Coord t in shotTransforms)
+            bool count;
+            foreach (Coord t in Coord.shotTransforms)
             {
-                loc = start.clone();
-                loc = Coord.add(loc, t);
-                count = isOnBoard(loc.x, loc.y) ? 1 : 0;
+                checkLocation = start.Clone();
+                checkLocation = Coord.Add(checkLocation, t);
+                count = IsOnBoard(checkLocation) ? true : false;
                 result[idx] = count;
                 idx++;
             }
             return result;
         }
 
-        public ArrayList filterMovesByDir(ArrayList moves, String dir)
+        ArrayList FilterMovesByDir(ArrayList moves, String dir)
         {
             ArrayList filtered = new ArrayList();
             foreach (Move m in moves)
@@ -123,7 +117,7 @@ namespace HelloWorld
             return filtered;
         }
 
-        public ArrayList filterMovesBySpaces(ArrayList moves, int[] spaces)
+        ArrayList FilterMovesBySpaces(ArrayList moves, int[] spaces)
         {
             ArrayList filtered = new ArrayList();
             foreach (Move m in moves)
@@ -134,87 +128,83 @@ namespace HelloWorld
                 }
                 else
                 {
-                    //{N, E, S, W} -> 0, 1, 2, 3
-                    int dirIdx = Array.IndexOf(moveDirs, m.dir);
-
-                    //limit in dir
+                    int dirIdx = Array.IndexOf(Globals.moveDirs, m.dir);
                     int limit = spaces[dirIdx];
-
-                    //target > limit?
                     if (int.Parse(m.target) <= limit) filtered.Add(m);
                 }
             }
             return filtered;
         }
 
-        public ArrayList getPossibleMoves(Player p)
+        public ArrayList GetPossibleMoves(Player p)
         {
             int[] space;
-            string[] shotDirs = new string[] { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-            ArrayList possMoves = (ArrayList)allMoves.Clone();
+            bool[] shots;
+            ArrayList possibleMoves = (ArrayList)allMoves.Clone();
 
-            space = getSpaceAroundPlayer(p);
-            possMoves = filterMovesBySpaces(possMoves, space);
+            space = GetSpaceAroundPlayer(p);
+            possibleMoves = FilterMovesBySpaces(possibleMoves, space);
 
-            space = getShotsAroundPlayer(p);
-            for (int i = 0; i < space.Length; i++)
+            shots = GetShotsAroundPlayer(p);
+            for (int i = 0; i < shots.Length; i++)
             {
-                if (space[i] == 0) possMoves = filterMovesByDir(possMoves, shotDirs[i]);
+                if (!shots[i]) possibleMoves = FilterMovesByDir(possibleMoves, Globals.shootDirs[i]);
             }
 
-            return possMoves;
+            return possibleMoves;
         }
 
-        void genAllMoves()
+        void GenAllMoves()
         {
-
-            foreach (String d in shootDirs)
+            allMoves = new ArrayList();
+            foreach (String d in Globals.shootDirs)
             {
-                foreach (String t in shootTargets)
+                foreach (String t in Globals.shootTargets)
                 {
                     allMoves.Add(new Move(d, t));
                 }
             }
-            foreach (String d in moveDirs)
+            foreach (String d in Globals.moveDirs)
             {
-                foreach (String t in moveTargets)
+                foreach (String t in Globals.moveTargets)
                 {
                     allMoves.Add(new Move(d, t));
                 }
             }
         }
 
-        public void print()
+        public void Print()
         {
-            for (int i = 0; i < numPlayers; i++)
+            Console.WriteLine("");
+            for (int i = 0; i < Globals.numPlayers; i++)
             {
                 Console.WriteLine("Player " + (i + 1) + " : Health=" + players[i].health + "   Score=" + players[i].score);
             }
             Console.WriteLine("");
             Console.Write("╔");
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < Globals.width; x++)
             {
                 Console.Write("═══");
             }
             Console.WriteLine("╗");
-            for (int y = height - 1; y >= 0; y--)
+            for (int y = Globals.height - 1; y >= 0; y--)
             {
                 Console.Write("║");
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < Globals.width; x++)
                 {
                     Coord cell = new Coord(x, y);
-                    if (cell.isSame(controlLocation))
+                    if (IsControlLocation(cell))
                     {
                         Console.Write(" § ");
                         continue;
                     }
-                    if (cell.isInArray(holeLocations))
+                    if (cell.IsInArray(holeLocations))
                     {
                         Console.Write(" ▓ ");
                     }
                     else
                     {
-                        int l = whichPlayerLocation(cell);
+                        int l = WhichPlayerLocation(cell);
                         if (l != -1)
                         {
                             Console.Write(" " + (l + 1) + " ");
@@ -228,18 +218,18 @@ namespace HelloWorld
                 Console.WriteLine("║");
             }
             Console.Write("╚");
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < Globals.width; x++)
             {
                 Console.Write("═══");
             }
             Console.WriteLine("╝");
         }
 
-        int whichPlayerLocation(Coord c)
+        int WhichPlayerLocation(Coord c)
         {
-            for (int i = 0; i < numPlayers; i++)
+            for (int i = 0; i < Globals.numPlayers; i++)
             {
-                if (c.isSame(players[i].location))
+                if (c.Equals(players[i].location))
                 {
                     return players[i].number;
                 }
@@ -247,11 +237,11 @@ namespace HelloWorld
             return -1;
         }
 
-        bool isHoleLocation(Coord c)
+        bool IsHoleLocation(Coord c)
         {
-            for (int i = 0; i < numHoles; i++)
+            for (int i = 0; i < Globals.numHoles; i++)
             {
-                if (holeLocations[i] != null && c.isSame(holeLocations[i]))
+                if (holeLocations[i] != null && c.Equals(holeLocations[i]))
                 {
                     return true;
                 }
@@ -259,11 +249,23 @@ namespace HelloWorld
             return false;
         }
 
-        bool isPlayerLocation(Coord c)
+        bool IsControlLocation(Coord c)
+        {
+            for (int i = 0; i < Globals.numControlPoints; i++)
+            {
+                if (controlLocations != null && controlLocations[i] != null && c.Equals(controlLocations[i]))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool IsPlayerLocation(Coord c)
         {
             foreach (Player p in players)
             {
-                if (c.isSame(p.location))
+                if (c.Equals(p.location))
                 {
                     return true;
                 }
@@ -271,142 +273,158 @@ namespace HelloWorld
             return false;
         }
 
-        void initHoleLocations()
+        void InitHoleLocations()
         {
             Random rnd = new Random(3);
-            Coord holeLoc;
-            for (int i = 0; i < numHoles; i++)
+            holeLocations = new Coord[Globals.numHoles];
+
+            Coord holeLocation;
+            for (int i = 0; i < Globals.numHoles; i++)
             {
                 do
                 {
-                    holeLoc = new Coord(rnd.Next(1, width - 1), rnd.Next(1, height - 1));
-                } while (isHoleLocation(holeLoc));
-                holeLocations[i] = holeLoc;
+                    holeLocation = new Coord(rnd.Next(1, Globals.width - 1), rnd.Next(1, Globals.height - 1));
+                } while (IsHoleLocation(holeLocation));
+                holeLocations[i] = holeLocation;
             }
         }
 
-        void setControlLocation(bool initialisation)
+        void SetControlLocations(bool initialisation)
         {
             Random rnd = new Random(0);
-            Coord controlLoc;
-            do
-            {
-                if (initialisation)
-                {
-                    controlLoc = new Coord(rnd.Next(1, width - 1), rnd.Next(1, height - 1));
-                }
-                else
-                {
-                    controlLoc = new Coord(rnd.Next(0, width), rnd.Next(0, height));
-                }
-            } while (isHoleLocation(controlLoc) || isPlayerLocation(controlLoc));
-            controlLocation = controlLoc;
-        }
+            controlLocations = new Coord[Globals.numControlPoints];
 
-        void initPlayerLocations()
-        {
-            for (int i = 0; i < numPlayers; i++)
+            Coord newControlLocation;
+            for (int i = 0; i < Globals.numControlPoints; i++)
             {
-                playerToSpawn(players[i]);
+                do
+                {
+                    if (initialisation)
+                    {
+                        newControlLocation = new Coord(rnd.Next(1, Globals.width - 1), rnd.Next(1, Globals.height - 1));
+                    }
+                    else
+                    {
+                        newControlLocation = new Coord(rnd.Next(0, Globals.width), rnd.Next(0, Globals.height));
+                    }
+                } while (IsHoleLocation(newControlLocation) || IsPlayerLocation(newControlLocation) || IsControlLocation(newControlLocation));
+                controlLocations[i] = newControlLocation;
             }
         }
 
-        void playerToSpawn(Player player)
+        void InitPlayerLocations()
         {
-            int w = (int)Math.Floor(width / 2.0);
-            int h = (int)Math.Floor(height / 2.0);
-            int r = width - 1;
-            int t = height - 1;
+            for (int i = 0; i < Globals.numPlayers; i++)
+            {
+                PlayerToSpawn(players[i]);
+            }
+        }
+
+        void PlayerToSpawn(Player player)
+        {
+            int halfWidth = (int)Math.Floor(Globals.width / 2.0);
+            int halfHeight = (int)Math.Floor(Globals.height / 2.0);
+            int rightSide = Globals.width - 1;
+            int topSide = Globals.height - 1;
 
             if (player.number == 0)
             {
-                player.location = new Coord(w, 0);
+                player.location = new Coord(halfWidth, 0);
             }
             else if (player.number == 1)
             {
-                player.location = new Coord(0, h);
+                player.location = new Coord(0, halfHeight);
             }
             else if (player.number == 2)
             {
-                player.location = new Coord(w, t);
+                player.location = new Coord(halfWidth, topSide);
             }
             else if (player.number == 3)
             {
-                player.location = new Coord(r, h);
+                player.location = new Coord(rightSide, halfHeight);
             }
         }
 
-        public void executeMoves(Move[,] moves)
+        public void ExecuteMoves(Move[,] moves)
         {
             Move[] round;
-            for (int i = 0; i < nMoves; i++)
+            for (int i = 0; i < Globals.numMoves; i++)
             {
-                round = getRankedRound(moves, i);
-                for (int j = 0; j < numPlayers; j++)
+                round = GetRankedRound(moves, i);
+                for (int j = 0; j < Globals.numPlayers; j++)
                 {
-                    Console.WriteLine("moving player " + (j+1));
                     if (round[j].shoot)
                     {
                         Console.WriteLine("Player " + (round[j].player.number + 1) + " takes their turn... : shooting " + round[j].dir + " at their opponent's " + round[j].target);
-                        playerShoot(round[j]);
                     }
                     else
                     {
                         Console.WriteLine("Player " + (round[j].player.number + 1) + " takes their turn... : moving " + round[j].dir + " " + round[j].target + " places");
-                        movePlayer(round[j]);
                     }
-                    print();
+                    MakeMove(round[j]);
+                    Print();
                     Console.ReadKey();
                 }
             }
             foreach (Player p in players)
             {
-                if (p.location.isSame(controlLocation))
+                if (IsControlLocation(p.location))
                 {
                     Console.WriteLine("Player " + (p.number + 1) + " finished the round on the control point!");
                     p.score++;
-                    setControlLocation(false);
+                    SetControlLocations(false);
                 }
             }
         }
 
-        public void playerShoot(Move m)
+        public void MakeMove(Move m){
+            if (m.shoot){
+                PlayerShoot(m);
+            }else{
+                MovePlayer(m);
+            }
+        }
+
+        public void PlayerShoot(Move m)
         {
-            Coord nextLoc = m.player.location.clone();
-            Coord transform = new Coord(0, 0);
+            Coord checkLocation = m.player.location.Clone();
+            Coord transform;
 
             switch (m.dir)
             {
                 case "N":
-                    transform = N;
+                    transform = Coord.N;
                     break;
                 case "NE":
-                    transform = NE;
+                    transform = Coord.NE;
                     break;
                 case "E":
-                    transform = E;
+                    transform = Coord.E;
                     break;
                 case "SE":
-                    transform = SE;
+                    transform = Coord.SE;
                     break;
                 case "S":
-                    transform = S;
+                    transform = Coord.S;
                     break;
                 case "SW":
-                    transform = SW;
+                    transform = Coord.SW;
                     break;
                 case "W":
-                    transform = W;
+                    transform = Coord.W;
                     break;
                 case "NW":
-                    transform = NW;
+                    transform = Coord.NW;
+                    break;
+                default:
+                    transform = null;
                     break;
             }
 
             do
             {
-                nextLoc = Coord.add(nextLoc, transform);
-                int pl = whichPlayerLocation(nextLoc);
+                checkLocation = Coord.Add(checkLocation, transform);
+                int pl = WhichPlayerLocation(checkLocation);
                 if (pl != -1)
                 {
                     Console.WriteLine("Shot HIT player " + (pl + 1));
@@ -417,39 +435,39 @@ namespace HelloWorld
                             if (players[pl].health == 0)
                             {
                                 players[pl].health = 3;
-                                playerToSpawn(players[pl]);
+                                PlayerToSpawn(players[pl]);
                                 m.player.score++;
                             }
                             break;
                         case "LARM":
                             foreach (Move p in players[pl].program)
                             {
-                                p.armHit(true);
+                                p.ArmHit(true);
                             }
                             break;
                         case "RARM":
                             foreach (Move p in players[pl].program)
                             {
-                                p.armHit(false);
+                                p.ArmHit(false);
                             }
                             break;
                         case "LLEG":
                             foreach (Move p in players[pl].program)
                             {
-                                p.legHit(true);
+                                p.LegHit(true);
                             }
                             break;
                         case "RLEG":
                             foreach (Move p in players[pl].program)
                             {
-                                p.legHit(false);
+                                p.LegHit(false);
                             }
                             break;
                         case "BODY":
-                            Coord pushedLoc = Coord.add(players[pl].location, transform);
-                            if (isOnBoard(pushedLoc.x, pushedLoc.y) && !isPlayerLocation(pushedLoc))
+                            Coord pushedLoc = Coord.Add(players[pl].location, transform);
+                            if (IsOnBoard(pushedLoc) && !IsPlayerLocation(pushedLoc))
                             {
-                                if (isHoleLocation(pushedLoc))
+                                if (IsHoleLocation(pushedLoc))
                                 {
                                     players[pl].health--;
                                     if (players[pl].health <= 0)
@@ -457,7 +475,7 @@ namespace HelloWorld
                                         players[pl].health = 3;
                                         players[pl].score--;
                                     }
-                                    playerToSpawn(players[pl]);
+                                    PlayerToSpawn(players[pl]);
                                     m.player.score++;
                                     Console.WriteLine("Player " + (m.player.number + 1) + " fell down a hole!");
                                 }
@@ -470,36 +488,36 @@ namespace HelloWorld
                     }
                     break;
                 }
-            } while (isOnBoard(nextLoc.x, nextLoc.y));
+            } while (IsOnBoard(checkLocation));
 
         }
 
-        public void movePlayer(Move m)
+        public void MovePlayer(Move m)
         {
-            Coord nextLoc = m.player.location.clone();
+            Coord checkLocation = m.player.location.Clone();
             Coord transform = new Coord(0, 0);
             int spaces = int.Parse(m.target);
 
             switch (m.dir)
             {
                 case "U":
-                    transform = U;
+                    transform = Coord.U;
                     break;
                 case "R":
-                    transform = R;
+                    transform = Coord.R;
                     break;
                 case "D":
-                    transform = D;
+                    transform = Coord.D;
                     break;
                 case "L":
-                    transform = L;
+                    transform = Coord.L;
                     break;
             }
 
             while (spaces > 0)
             {
-                nextLoc = Coord.add(nextLoc, transform);
-                if (isHoleLocation(nextLoc))
+                checkLocation = Coord.Add(checkLocation, transform);
+                if (IsHoleLocation(checkLocation))
                 {
                     m.player.health--;
                     if (m.player.health <= 0)
@@ -507,57 +525,57 @@ namespace HelloWorld
                         m.player.health = 3;
                         m.player.score--;
                     }
-                    playerToSpawn(m.player);
+                    PlayerToSpawn(m.player);
                     Console.WriteLine("Player " + (m.player.number + 1) + " fell down a hole!");
                     break;
                 }
-                else if (!isOnBoard(nextLoc.x, nextLoc.y) || isPlayerLocation(nextLoc))
+                else if (!IsOnBoard(checkLocation) || IsPlayerLocation(checkLocation))
                 {
                     break;
                 }
                 spaces--;
-                m.player.location = nextLoc;
+                m.player.location = checkLocation;
             }
 
         }
 
-        public Coord moveToTransform(Move m)
+        public Coord MoveToTransform(Move m)
         {
-            int dist;
-            dist = int.Parse(m.target);
+            int distance;
+            distance = int.Parse(m.target);
             if (m.dir.Equals("U"))
             {
-                return new Coord(0, dist);
+                return new Coord(0, distance);
             }
             else if (m.dir.Equals("R"))
             {
-                return new Coord(dist, 0);
+                return new Coord(distance, 0);
             }
             else if (m.dir.Equals("D"))
             {
-                return new Coord(0, -dist);
+                return new Coord(0, -distance);
             }
             else if (m.dir.Equals("L"))
             {
-                return new Coord(-dist, 0);
+                return new Coord(-distance, 0);
             }
             return null;
         }
 
-        public bool isOnBoard(int x, int y)
+        public bool IsOnBoard(Coord c)
         {
-            return (x >= 0) && (y >= 0) && (x < width) && (y < height);
+            return (c.x >= 0) && (c.y >= 0) && (c.x < Globals.width) && (c.y < Globals.height);
         }
 
-        Move[] getRankedRound(Move[,] moves, int number)
+        Move[] GetRankedRound(Move[,] moves, int number)
         {
-            Move[] round = new Move[numPlayers];
-            for (int i = 0; i < numPlayers; i++)
+            Move[] round = new Move[Globals.numPlayers];
+            for (int i = 0; i < Globals.numPlayers; i++)
             {
                 round[i] = moves[i, number];
             }
             //shuffleMoves(round);  need to implement!
-            Array.Sort(round, delegate (Move x, Move y) { return x.rank - y.rank; });
+            //Array.Sort(round, delegate (Move x, Move y) { return x.rank - y.rank; });
             return round;
         }
     }
@@ -567,22 +585,39 @@ namespace HelloWorld
         public int x;
         public int y;
 
+        public static Coord N = new Coord(0, 1);
+        public static Coord NE = new Coord(1, 1);
+        public static Coord E = new Coord(1, 0);
+        public static Coord SE = new Coord(1, -1);
+        public static Coord S = new Coord(0, -1);
+        public static Coord SW = new Coord(-1, -1);
+        public static Coord W = new Coord(-1, 0);
+        public static Coord NW = new Coord(-1, 1);
+
+        public static Coord U = N;
+        public static Coord R = E;
+        public static Coord D = S;
+        public static Coord L = W;
+
+        public static Coord[] shotTransforms = { N, NE, E, SE, S, SW, W, NW };
+        public static Coord[] moveTransforms = { U, R, D, L };
+
         public Coord(int x, int y)
         {
             this.x = x;
             this.y = y;
         }
 
-        public bool isSame(Coord c)
+        public bool Equals(Coord c)
         {
             return (c.x == x) && (c.y == y);
         }
 
-        public bool isInArray(Coord[] c)
+        public bool IsInArray(Coord[] c)
         {
             for (int i = 0; i < c.Length; i++)
             {
-                if (isSame(c[i]))
+                if (Equals(c[i]))
                 {
                     return true;
                 }
@@ -590,28 +625,16 @@ namespace HelloWorld
             return false;
         }
 
-        public int idxInArray(Coord[] c)
-        {
-            Console.WriteLine("size = " + c.Length);
-            for (int i = 0; i < c.Length; i++)
-            {
-                if (isSame(c[i]))
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        public Coord clone()
+        public Coord Clone()
         {
             return new Coord(x, y);
         }
 
-        public static Coord add(Coord a, Coord b)
+        public static Coord Add(Coord a, Coord b)
         {
             return new Coord(a.x + b.x, a.y + b.y);
         }
+
         public static int manhattanDistance(Coord a, Coord b)
         {
             return Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
@@ -622,43 +645,36 @@ namespace HelloWorld
     {
         static void Main()
         {
-            int nPlayers = 4;
-            int nMoves = 1; //change back to 3
-
-            Player[] players = new Player[nPlayers];
-            for (int i = 0; i < players.Length; i++)
+            Player[] players = new Player[Globals.numPlayers];
+            for (int i = 0; i < Globals.numPlayers; i++)
             {
                 players[i] = new Player(i, (i != 0 ? "computer" : "human"));
             }
 
-            Board b = new Board(players);
+            Board board = new Board(players);
 
-            for (int i = 0; i < players.Length; i++)
-            {
-                players[i].setBoard(b);
-            }
+            PrintIntro();
 
-            printIntro();
-            b.print();
-
-            Move[,] programming = new Move[nPlayers, nMoves];
-            Move[] temp = new Move[nMoves];
+            Move[,] programming = new Move[Globals.numPlayers, Globals.numMoves];
+            Move[] temp = new Move[Globals.numMoves];
 
             while (true)
             {
-                for (int i = 0; i < nPlayers; i++)
+                board.Print();
+                for (int i = 0; i < Globals.numPlayers; i++)
                 {
-                    temp = players[i].makeMove();
-                    for (int j = 0; j < nMoves; j++)
+                    temp = players[i].MakeMove(board);
+                    for (int j = 0; j < Globals.numMoves; j++)
                     {
                         programming[i, j] = temp[j];
                     }
                 }
                 Console.WriteLine("All programs locked in!");
-                b.executeMoves(programming);
+                board.ExecuteMoves(programming);
             }
         }
-        static void printIntro()
+
+        static void PrintIntro()
         {
             Console.WriteLine("Welcome to Volt!");
             Console.WriteLine("");
@@ -671,12 +687,6 @@ namespace HelloWorld
 
     class Move
     {
-        static String[] shootDirs = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-        static String[] shootTargets = { "HEAD", "BODY", "LARM", "RARM", "LLEG", "RLEG" };
-        static int[] targetRanks = { 5, 4, 2, 2, 3, 3 };
-        static String[] moveDirs = { "U", "R", "D", "L" };
-        static String[] moveTargets = { "1", "2", "3", "4", "5", "6" };
-
         public int rank;
         public bool shoot;
         public String dir;
@@ -688,10 +698,10 @@ namespace HelloWorld
             this.player = player;
             this.dir = dir;
             this.target = target;
-            if (Array.IndexOf(shootDirs, dir) != -1)
+            if (Array.IndexOf(Globals.shootDirs, dir) != -1)
             {
                 shoot = true;
-                rank = targetRanks[Array.IndexOf(shootTargets, target)];
+                rank = Globals.targetRanks[Array.IndexOf(Globals.shootTargets, target)];
             }
             else
             {
@@ -703,10 +713,10 @@ namespace HelloWorld
         {
             this.dir = dir;
             this.target = target;
-            if (Array.IndexOf(shootDirs, dir) != -1)
+            if (Array.IndexOf(Globals.shootDirs, dir) != -1)
             {
                 shoot = true;
-                rank = targetRanks[Array.IndexOf(shootTargets, target)];
+                rank = Globals.targetRanks[Array.IndexOf(Globals.shootTargets, target)];
             }
             else
             {
@@ -715,11 +725,13 @@ namespace HelloWorld
             }
         }
 
-        public Move clone(){
+        public Move Clone()
+        {
             return new Move(dir, target);
         }
 
-        public void print(){
+        public void Print()
+        {
             if (shoot)
             {
                 Console.WriteLine("Shooting " + dir + " at opponent's " + target);
@@ -727,18 +739,18 @@ namespace HelloWorld
             else
             {
                 Console.WriteLine("Moving " + dir + " " + target + " spaces");
-            }            
+            }
         }
 
-        public static bool isValidInput(String s)
+        public static bool IsValidInput(String s)
         {
             if (s.Split(' ').Length < 2) return false;
             String dir = s.Split(' ')[0];
             String target = s.Split(' ')[1];
-            return ((arrContainsStr(shootDirs, dir) && arrContainsStr(shootTargets, target)) || (arrContainsStr(moveDirs, dir) && arrContainsStr(moveTargets, target)));
+            return ((ArrContainsStr(Globals.shootDirs, dir) && ArrContainsStr(Globals.shootTargets, target)) || (ArrContainsStr(Globals.moveDirs, dir) && ArrContainsStr(Globals.moveTargets, target)));
         }
 
-        static bool arrContainsStr(String[] arr, String s)
+        static bool ArrContainsStr(String[] arr, String s)
         {
             foreach (String t in arr)
             {
@@ -747,39 +759,39 @@ namespace HelloWorld
             return false;
         }
 
-        public void legHit(bool left)
-        {  //moves movements
+        public void LegHit(bool left)
+        {
             if (shoot) return;
-            int idx = Array.IndexOf(moveDirs, dir);
+            int idx = Array.IndexOf(Globals.moveDirs, dir);
             if (left)
-            {  //ccw
-                int newIdx = mod(idx - 1, moveDirs.Length);
-                dir = moveDirs[newIdx];
+            {   //ccw
+                int newIdx = Modulo(idx - 1, Globals.moveDirs.Length);
+                dir = Globals.moveDirs[newIdx];
             }
             else
-            {      //cw
-                int newIdx = mod(idx + 1, moveDirs.Length);
-                dir = moveDirs[newIdx];
+            {   //cw
+                int newIdx = Modulo(idx + 1, Globals.moveDirs.Length);
+                dir = Globals.moveDirs[newIdx];
             }
         }
 
-        public void armHit(bool left)
-        {  //moves shots
+        public void ArmHit(bool left)
+        { 
             if (!shoot) return;
-            int idx = Array.IndexOf(shootDirs, dir);
+            int idx = Array.IndexOf(Globals.shootDirs, dir);
             if (left)
-            {  //ccw
-                int newIdx = mod(idx - 1, shootDirs.Length);
-                dir = shootDirs[newIdx];
+            {   //ccw
+                int newIdx = Modulo(idx - 1, Globals.shootDirs.Length);
+                dir = Globals.shootDirs[newIdx];
             }
             else
-            {      //cw
-                int newIdx = mod(idx + 1, shootDirs.Length);
-                dir = shootDirs[newIdx];
+            {   //cw
+                int newIdx = Modulo(idx + 1, Globals.shootDirs.Length);
+                dir = Globals.shootDirs[newIdx];
             }
         }
 
-        int mod(int a, int b)
+        int Modulo(int a, int b)
         {
             return a - b * (int)Math.Floor((double)a / (double)b);
         }
@@ -792,28 +804,21 @@ namespace HelloWorld
         public int score = 0;
         public int health = 3;
         public Coord location;
-        Board board;
         public Move[] program;
 
-        public Player(int number, String strategy)
+        public Player(int number, string strategy)
         {
             this.number = number;
             this.strategy = strategy;
         }
 
-        public void setBoard(Board b)
+        public Move[] HumanMove(Board board)
         {
-            board = b;
-        }
-
-        public Move[] humanMove()
-        {
-            int nMoves = 1;
-            Move[] moves = new Move[nMoves];
+            Move[] moves = new Move[Globals.numMoves];
 
             String line;
             bool error;
-            for (int i = 0; i < nMoves; i++)
+            for (int i = 0; i < Globals.numMoves; i++)
             {
                 error = false;
                 do
@@ -822,23 +827,32 @@ namespace HelloWorld
                     Console.WriteLine("Please enter command #" + (i + 1));
                     line = Console.ReadLine().ToUpper();
                     error = true;
-                } while (!Move.isValidInput(line));
+                } while (!Move.IsValidInput(line));
                 moves[i] = new Move(this, line.Split(' ')[0], line.Split(' ')[1]);
             }
             program = moves;
             return moves;
         }
 
-        public int controlEvalFunction(Coord loc, Coord control)
+        public int ControlPointEvalFunction(Coord location, Coord[] controlPoints)
         {
-            return Coord.manhattanDistance(control, loc);
+            int lowest = int.MaxValue;
+            int value;
+            foreach (Coord cp in controlPoints)
+            {
+                value = Coord.manhattanDistance(cp, location);
+                if (value < lowest)
+                {
+                    lowest = value;
+                }
+            }
+            return lowest;
         }
 
-        public Move[] computerMove()
+        public Move[] ComputerMove(Board board)
         {
-            int nMoves = 1;
-            Move[] moves = new Move[nMoves];
-            ArrayList possible = board.getPossibleMoves(this);
+            Move[] moves = new Move[Globals.numMoves];
+            ArrayList possible = board.GetPossibleMoves(this);
             int currentBestVal = int.MaxValue;
             Move currentBestMove = (Move)possible[0];
             int value;
@@ -846,35 +860,59 @@ namespace HelloWorld
             foreach (Move n in possible)
             {
                 if (n.shoot) continue;
-                Console.Write("testing : ");
-                n.print();
-                Coord transform = board.moveToTransform(n);
-                value = controlEvalFunction(Coord.add(transform, location), board.controlLocation);
-                Console.WriteLine("value = " + value);
-                if (value < currentBestVal){
-                    Console.WriteLine("new best!");
+                Coord transform = board.MoveToTransform(n);
+                value = ControlPointEvalFunction(Coord.Add(transform, location), board.controlLocations);
+                if (value < currentBestVal)
+                {
                     currentBestMove = n;
                     currentBestVal = value;
                 }
             }
-            moves[0] = currentBestMove.clone();
+            //only works for one move!
+            moves[0] = currentBestMove.Clone();
             moves[0].player = this;
 
+            program = moves;
             return moves;
         }
 
-        public Move[] makeMove()
+        public Move[] MakeMove(Board board)
         {
             Console.WriteLine("Player " + (number + 1) + "'s programming phase...");
             switch (strategy)
             {
                 case "human":
-                    return humanMove();
+                    return HumanMove(board);
                 case "computer":
-                    return computerMove();
+                    return ComputerMove(board);
             }
             return null;
         }
 
+        public Player Clone()
+        {
+            Player cloned = new Player(number, strategy);
+            cloned.score = score;
+            cloned.health = health;
+            if (location != null) cloned.location = location.Clone();
+            if (program != null)
+            {
+                Move[] moves = new Move[Globals.numMoves];
+                for (int i = 0; i < Globals.numMoves; i++)
+                {
+                    if (program[i] != null) moves[i] = program[i].Clone();
+                }
+            }
+            return cloned;
+        }
+    }
+
+    class Node {
+        public Board board;
+        public int score;
+        public int games; 
+        public Node (Board board){
+            this.board = board;
+        }
     }
 }
