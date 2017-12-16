@@ -41,7 +41,7 @@ namespace Volt
         }
 
         public Board Clone(){
-            Player[] clonedPlayers = Player[Globals.numPlayers];
+            Player[] clonedPlayers = new Player[Globals.numPlayers];
             for (int i = 0; i < Globals.numPlayers; i++){
                 clonedPlayers[i] = players[i].Clone();
             }
