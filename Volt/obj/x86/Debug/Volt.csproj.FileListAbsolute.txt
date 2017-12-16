@@ -1,0 +1,5 @@
+/Users/user/Projects/Volt/Volt/bin/Debug/Volt.exe
+/Users/user/Projects/Volt/Volt/bin/Debug/Volt.pdb
+/Users/user/Projects/Volt/Volt/obj/x86/Debug/Volt.csproj.CoreCompileInputs.cache
+/Users/user/Projects/Volt/Volt/obj/x86/Debug/Volt.exe
+/Users/user/Projects/Volt/Volt/obj/x86/Debug/Volt.pdb
