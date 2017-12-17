@@ -20,6 +20,8 @@ namespace Volt
         public static int height = 9;
         public static int numHoles = 5;
         public static int numControlPoints = 1;
+
+        public static float epsilon = 0.25F;
     }
 
     class Board
@@ -40,22 +42,26 @@ namespace Volt
             GenAllMoves();
         }
 
-        public Board Clone(){
+        public Board Clone()
+        {
             Player[] clonedPlayers = new Player[Globals.numPlayers];
-            for (int i = 0; i < Globals.numPlayers; i++){
+            for (int i = 0; i < Globals.numPlayers; i++)
+            {
                 clonedPlayers[i] = players[i].Clone();
             }
 
             Board clonedBoard = new Board(clonedPlayers);
 
             Coord[] clonedHoleLocations = new Coord[Globals.numHoles];
-            for (int i = 0; i < Globals.numHoles; i++){
+            for (int i = 0; i < Globals.numHoles; i++)
+            {
                 clonedHoleLocations[i] = holeLocations[i].Clone();
             }
             clonedBoard.holeLocations = clonedHoleLocations;
 
             Coord[] clonedControlLocations = new Coord[Globals.numControlPoints];
-            for (int i = 0; i < Globals.numControlPoints; i++){
+            for (int i = 0; i < Globals.numControlPoints; i++)
+            {
                 clonedControlLocations[i] = controlLocations[i].Clone();
             }
             clonedBoard.controlLocations = clonedControlLocations;
@@ -151,7 +157,24 @@ namespace Volt
                 if (!shots[i]) possibleMoves = FilterMovesByDir(possibleMoves, Globals.shootDirs[i]);
             }
 
+            foreach (Move m in possibleMoves)
+            {
+                m.player = p;
+            }
+
             return possibleMoves;
+        }
+
+        public ArrayList[] GetAllPlayersPossibleMoves()
+        {
+            ArrayList[] result = new ArrayList[Globals.numPlayers];
+            int idx = 0;
+            foreach (Player p in players)
+            {
+                result[idx] = GetPossibleMoves(p);
+                idx++;
+            }
+            return result;
         }
 
         void GenAllMoves()
@@ -377,10 +400,39 @@ namespace Volt
             }
         }
 
-        public void MakeMove(Move m){
-            if (m.shoot){
+        public void ExecuteMoves(Move[] round)
+        {   //should be for tree traversal use only
+            round = GetRankedRound(round);
+
+            Move[] program = new Move[1];
+            for (int j = 0; j < Globals.numPlayers; j++)
+            {
+                round[j].player = players[j];
+                program[0] = round[j];
+                players[j].program = program;
+            }
+            for (int i = 0; i < Globals.numPlayers; i++){
+                MakeMove(round[i]);
+            }
+
+            foreach (Player p in players)
+            {
+                if (IsControlLocation(p.location))
+                {
+                    p.score++;
+                    SetControlLocations(false);
+                }
+            }
+        }
+
+        public void MakeMove(Move m)
+        {
+            if (m.shoot)
+            {
                 PlayerShoot(m);
-            }else{
+            }
+            else
+            {
                 MovePlayer(m);
             }
         }
@@ -578,6 +630,13 @@ namespace Volt
             //Array.Sort(round, delegate (Move x, Move y) { return x.rank - y.rank; });
             return round;
         }
+
+        Move[] GetRankedRound(Move[] round)
+        {
+            //shuffleMoves(round);  need to implement!
+            //Array.Sort(round, delegate (Move x, Move y) { return x.rank - y.rank; });
+            return round;
+        }
     }
 
     class Coord
@@ -653,6 +712,27 @@ namespace Volt
 
             Board board = new Board(players);
 
+            Node n = new Node(board, 0);
+            int count;
+            for (int i = 0; i < Globals.numPlayers; i++)
+            {
+                Console.WriteLine("Inital possible moves for player " + (i + 1));
+                count = 0;
+                foreach (Move m in n.possibleMoves[i])
+                {
+                    Console.Write(count + ": ");
+                    m.Print();
+                    count++;
+                }
+            }
+
+            Console.WriteLine("");
+
+            n.RunMCTS(3);
+
+
+
+            /*
             PrintIntro();
 
             Move[,] programming = new Move[Globals.numPlayers, Globals.numMoves];
@@ -671,7 +751,8 @@ namespace Volt
                 }
                 Console.WriteLine("All programs locked in!");
                 board.ExecuteMoves(programming);
-            }
+
+            }*/
         }
 
         static void PrintIntro()
@@ -776,7 +857,7 @@ namespace Volt
         }
 
         public void ArmHit(bool left)
-        { 
+        {
             if (!shoot) return;
             int idx = Array.IndexOf(Globals.shootDirs, dir);
             if (left)
@@ -907,12 +988,220 @@ namespace Volt
         }
     }
 
-    class Node {
+    class Node
+    {
         public Board board;
         public int score;
-        public int games; 
-        public Node (Board board){
+        public int games;
+        public int depth;
+        public int playerNumber;
+        public Node parent;
+        static int maxDepth = 1;
+        static float tuneableParam = 1;
+        public int totalPlays;
+        public ArrayList[] possibleMoves;
+        public int numPossibleMoves;
+        public int[] moveScores;
+        public int[] movePlays;
+        public Random rnd = new Random();
+
+        public bool isRoot = true;
+
+        public Node(Board board, int playerNumber)
+        {
             this.board = board;
+            this.possibleMoves = board.GetAllPlayersPossibleMoves();
+            this.numPossibleMoves = possibleMoves[playerNumber].Count;
+            this.moveScores = new int[numPossibleMoves];
+            this.movePlays = new int[numPossibleMoves];
+            this.playerNumber = playerNumber;
+            this.depth = 0;
         }
+
+        Node(Board board, Node n)
+        { // Make child, should be only used within class
+            this.board = board;
+            this.score = n.score;
+            this.games = n.games;
+            this.depth = n.depth + 1;
+            this.playerNumber = n.playerNumber;
+            this.parent = n;
+            this.possibleMoves = board.GetAllPlayersPossibleMoves();
+            isRoot = false;
+        }
+
+        public Move RunMCTS(int limit)
+        {
+            limit += numPossibleMoves;
+            totalPlays = 0;
+            for (int i = 0; i < numPossibleMoves; i++)
+            {
+                //playout(move[i])
+                int moveScore = Playout((Move)possibleMoves[playerNumber][i]);
+                totalPlays++;
+                //update average score in moveScores[index of random]
+                moveScores[i] += moveScore;
+                movePlays[i]++;
+            }
+
+            int idx;
+            while (totalPlays <= limit)
+            {
+                idx = IdxFromUCB();
+
+                Move m = (Move)possibleMoves[playerNumber][idx];
+                int moveScore = Playout(m);
+                totalPlays++;
+                moveScores[idx] += moveScore;
+                movePlays[idx]++;
+            }
+
+            return (Move)possibleMoves[playerNumber][IdxFromUCB()];
+        }
+
+        int IdxFromUCB(){
+            double bestUCB = double.MinValue;
+            int bestUCBIdx = 0;
+            double UCB;
+            for (int i = 0; i < numPossibleMoves; i++){
+                UCB = moveScores[i] + tuneableParam * Math.Sqrt( Math.Log( totalPlays ) / movePlays[i] );
+                if (UCB > bestUCB){
+                    bestUCB = UCB;
+                    bestUCBIdx = i;
+                }
+            }
+            return bestUCBIdx;
+        }
+
+        int IdxFromEpsilonGreedy(){
+            if (rnd.NextDouble() < Globals.epsilon)
+            {
+                return rnd.Next(numPossibleMoves);
+            }
+            else
+            {
+                return GetBestMove();
+            }
+        }
+
+        int GetBestMove()
+        {
+            int bestAvgScore = int.MinValue;
+            int bestIdx = 0;
+            int moveScore;
+            for (int i = 0; i < numPossibleMoves; i++)
+            {
+                moveScore = moveScores[i] / movePlays[i];
+                if (moveScore > bestAvgScore)
+                {
+                    bestAvgScore = moveScore;
+                    bestIdx = i;
+                }
+            }
+            return bestIdx;
+        }
+
+        public int Playout(Move m)
+        {
+            if (depth <= maxDepth)
+            {
+                Node child = MakeMoveWithRandomRound(m);
+                return child.Playout();
+            }
+            else
+            {
+                return EvaluateLeaf();
+            }
+        }
+
+        public int Playout()
+        {
+            if (depth <= maxDepth)
+            {
+                Node child = RandomRound();
+                return child.Playout();
+            }
+            else
+            {
+                return EvaluateLeaf();
+            }
+        }
+
+        public Move PlayerMoveFromIdx(int idx)
+        {
+            Move m = (Move)possibleMoves[playerNumber][idx];
+            Console.Write("getting move from idx : ");
+            m.Print();
+            return m;
+        }
+
+        public Move[] GetRandomMoves()
+        {
+            Move[] moves = new Move[Globals.numPlayers];
+            for (int i = 0; i < Globals.numPlayers; i++)
+            {
+                bool shoot = rnd.Next(3) == 0; // 33% chance
+                do
+                {
+                    moves[i] = (Move)possibleMoves[i][rnd.Next(possibleMoves[i].Count)];
+                } while (moves[i].shoot != shoot);
+                //Console.Write("(random) Player " + (i + 1) + " is: ");
+                moves[i].Print();
+            }
+            return moves;
+        }
+
+        public Node MakeMoveWithRandomRound(Move m)
+        {
+            Move[] round = GetRandomMoves();
+            round[playerNumber] = m;
+
+            Board nextBoard = board.Clone();
+            nextBoard.ExecuteMoves(round);
+
+            Node nextNode = new Node(nextBoard, this);
+            return nextNode;
+        }
+
+        public Node RandomRound()
+        {
+            
+            Move[] round = GetRandomMoves();
+
+            Board nextBoard = board.Clone();
+
+            /*
+            Board nextBoard = board.Clone();
+            possibleMoves = nextBoard.GetAllPlayersPossibleMoves();
+            Move[] round = GetRandomMoves();
+            */
+            nextBoard.ExecuteMoves(round);
+
+            Node nextNode = new Node(nextBoard, this);
+            return nextNode;
+        }
+
+        public int EvaluateLeaf()
+        {
+            //games++;
+            int newScore = 5;   //evalBoard
+            //score = newScore / games;
+            return newScore;
+            //BackPropagate(score, games);
+        }
+
+        public void BackPropagate(int score, int games)
+        {
+            if (!isRoot)
+            {
+                this.score = score;
+                this.games = games;
+                parent.BackPropagate(score, games);
+            }
+        }
+    }
+
+    class Evaluator {
+        
     }
 }
