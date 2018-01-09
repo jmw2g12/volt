@@ -1,0 +1,36 @@
+{
+	"players": [
+		{
+			"player_number": 1,
+			"strategy": {
+				"type": "mcts",
+				"limit": 20000,
+				"epsilon": 0.66
+			}
+		},
+		{
+			"player_number": 2,
+			"strategy": {
+				"type": "mcts",
+				"limit": 20000,
+				"epsilon": 0.66
+			}
+		},
+		{
+			"player_number": 3,
+			"strategy": {
+				"type": "mcts",
+				"limit": 20000,
+				"epsilon": 0.66
+			}
+		},
+		{
+			"player_number": 4,
+			"strategy": {
+				"type": "mcts",
+				"limit": 20000,
+				"epsilon": 0.66
+			}
+		}
+	]
+}

@@ -1,5 +1,8 @@
 using System;
 using System.Collections;
+using System.IO;
+using Newtonsoft.Json;
+
 namespace Volt
 {
     public static class Globals
@@ -15,21 +18,27 @@ namespace Volt
         public static int numMoveOptions = moveDirs.Length;
         public static String[] moveTargets = { "1", "2", "3", "4", "5", "6" };
 
+        public static bool supressAllOutput = false;
 
         public static int width = 9;
         public static int height = 9;
         public static int numHoles = 5;
         public static int numControlPoints = 1;
 
-        public static float epsilon = 0.25F;
+        public static int MCTSLimit = 20000;
+        public static float epsilon = 0.66F;
+
+        public static int maxTurns = 10;
     }
 
     class Board
     {
-        static ArrayList allMoves;
+        public static ArrayList allMoves = GenAllMoves();
         Player[] players;
         public Coord[] holeLocations;
         public Coord[] controlLocations;
+
+        public bool supressOutput;
 
         public Board(Player[] players)
         {
@@ -38,8 +47,15 @@ namespace Volt
             InitPlayerLocations();
             InitHoleLocations();
             SetControlLocations(true);
+            supressOutput = true;
+        }
 
-            GenAllMoves();
+        public Board(Player[] players, Coord[] holeLocations, Coord[] controlLocations)
+        {
+            this.players = players;
+            this.holeLocations = holeLocations;
+            this.controlLocations = controlLocations;
+            supressOutput = true;
         }
 
         public Board Clone()
@@ -50,23 +66,19 @@ namespace Volt
                 clonedPlayers[i] = players[i].Clone();
             }
 
-            Board clonedBoard = new Board(clonedPlayers);
-
             Coord[] clonedHoleLocations = new Coord[Globals.numHoles];
             for (int i = 0; i < Globals.numHoles; i++)
             {
                 clonedHoleLocations[i] = holeLocations[i].Clone();
             }
-            clonedBoard.holeLocations = clonedHoleLocations;
 
             Coord[] clonedControlLocations = new Coord[Globals.numControlPoints];
             for (int i = 0; i < Globals.numControlPoints; i++)
             {
                 clonedControlLocations[i] = controlLocations[i].Clone();
             }
-            clonedBoard.controlLocations = clonedControlLocations;
 
-            return clonedBoard;
+            return new Board(clonedPlayers, clonedHoleLocations, clonedControlLocations);
         }
 
         public int[] GetSpaceAroundPlayer(Player player)
@@ -142,6 +154,32 @@ namespace Volt
             return filtered;
         }
 
+        ArrayList FilterMovesOnly(ArrayList moves)
+        {
+            ArrayList filtered = new ArrayList();
+            foreach (Move m in moves)
+            {
+                if (!m.shoot)
+                {
+                    filtered.Add(m);
+                }
+            }
+            return filtered;
+        }
+
+        ArrayList FilterShotsOnly(ArrayList moves)
+        {
+            ArrayList filtered = new ArrayList();
+            foreach (Move m in moves)
+            {
+                if (m.shoot)
+                {
+                    filtered.Add(m);
+                }
+            }
+            return filtered;
+        }
+
         public ArrayList GetPossibleMoves(Player p)
         {
             int[] space;
@@ -177,75 +215,76 @@ namespace Volt
             return result;
         }
 
-        void GenAllMoves()
+        static ArrayList GenAllMoves()
         {
-            allMoves = new ArrayList();
+            ArrayList allMovesAL = new ArrayList();
             foreach (String d in Globals.shootDirs)
             {
                 foreach (String t in Globals.shootTargets)
                 {
-                    allMoves.Add(new Move(d, t));
+                    allMovesAL.Add(new Move(d, t));
                 }
             }
             foreach (String d in Globals.moveDirs)
             {
                 foreach (String t in Globals.moveTargets)
                 {
-                    allMoves.Add(new Move(d, t));
+                    allMovesAL.Add(new Move(d, t));
                 }
             }
+            return allMovesAL;
         }
 
         public void Print()
         {
-            Console.WriteLine("");
+            if (!Globals.supressAllOutput) Console.WriteLine("");
             for (int i = 0; i < Globals.numPlayers; i++)
             {
-                Console.WriteLine("Player " + (i + 1) + " : Health=" + players[i].health + "   Score=" + players[i].score);
+                if (!Globals.supressAllOutput) Console.WriteLine("Player " + (i + 1) + " : Health=" + players[i].health + "   Score=" + players[i].score);
             }
-            Console.WriteLine("");
-            Console.Write("╔");
+            if (!Globals.supressAllOutput) Console.WriteLine("");
+            if (!Globals.supressAllOutput) Console.Write("╔");
             for (int x = 0; x < Globals.width; x++)
             {
-                Console.Write("═══");
+                if (!Globals.supressAllOutput) Console.Write("═══");
             }
-            Console.WriteLine("╗");
+            if (!Globals.supressAllOutput) Console.WriteLine("╗");
             for (int y = Globals.height - 1; y >= 0; y--)
             {
-                Console.Write("║");
+                if (!Globals.supressAllOutput) Console.Write("║");
                 for (int x = 0; x < Globals.width; x++)
                 {
                     Coord cell = new Coord(x, y);
                     if (IsControlLocation(cell))
                     {
-                        Console.Write(" § ");
+                        if (!Globals.supressAllOutput) Console.Write(" § ");
                         continue;
                     }
                     if (cell.IsInArray(holeLocations))
                     {
-                        Console.Write(" ▓ ");
+                        if (!Globals.supressAllOutput) Console.Write(" ▓ ");
                     }
                     else
                     {
                         int l = WhichPlayerLocation(cell);
                         if (l != -1)
                         {
-                            Console.Write(" " + (l + 1) + " ");
+                            if (!Globals.supressAllOutput) Console.Write(" " + (l + 1) + " ");
                         }
                         else
                         {
-                            Console.Write(" · "); //×·
+                            if (!Globals.supressAllOutput) Console.Write(" · "); //×·
                         }
                     }
                 }
-                Console.WriteLine("║");
+                if (!Globals.supressAllOutput) Console.WriteLine("║");
             }
-            Console.Write("╚");
+            if (!Globals.supressAllOutput) Console.Write("╚");
             for (int x = 0; x < Globals.width; x++)
             {
-                Console.Write("═══");
+                if (!Globals.supressAllOutput) Console.Write("═══");
             }
-            Console.WriteLine("╝");
+            if (!Globals.supressAllOutput) Console.WriteLine("╝");
         }
 
         int WhichPlayerLocation(Coord c)
@@ -378,11 +417,11 @@ namespace Volt
                 {
                     if (round[j].shoot)
                     {
-                        Console.WriteLine("Player " + (round[j].player.number + 1) + " takes their turn... : shooting " + round[j].dir + " at their opponent's " + round[j].target);
+                        if (!supressOutput && !Globals.supressAllOutput) Console.WriteLine("Player " + (round[j].player.number + 1) + " takes their turn... : shooting " + round[j].dir + " at their opponent's " + round[j].target);
                     }
                     else
                     {
-                        Console.WriteLine("Player " + (round[j].player.number + 1) + " takes their turn... : moving " + round[j].dir + " " + round[j].target + " places");
+                        if (!supressOutput && !Globals.supressAllOutput) Console.WriteLine("Player " + (round[j].player.number + 1) + " takes their turn... : moving " + round[j].dir + " " + round[j].target + " places");
                     }
                     MakeMove(round[j]);
                     Print();
@@ -393,7 +432,7 @@ namespace Volt
             {
                 if (IsControlLocation(p.location))
                 {
-                    Console.WriteLine("Player " + (p.number + 1) + " finished the round on the control point!");
+                    if (!supressOutput && !Globals.supressAllOutput) Console.WriteLine("Player " + (p.number + 1) + " finished the round on the control point!");
                     p.score++;
                     SetControlLocations(false);
                 }
@@ -411,7 +450,8 @@ namespace Volt
                 program[0] = round[j];
                 players[j].program = program;
             }
-            for (int i = 0; i < Globals.numPlayers; i++){
+            for (int i = 0; i < Globals.numPlayers; i++)
+            {
                 MakeMove(round[i]);
             }
 
@@ -479,7 +519,7 @@ namespace Volt
                 int pl = WhichPlayerLocation(checkLocation);
                 if (pl != -1)
                 {
-                    Console.WriteLine("Shot HIT player " + (pl + 1));
+                    if (!supressOutput && !Globals.supressAllOutput) Console.WriteLine("Shot HIT player " + (pl + 1));
                     switch (m.target)
                     {
                         case "HEAD":
@@ -529,7 +569,7 @@ namespace Volt
                                     }
                                     PlayerToSpawn(players[pl]);
                                     m.player.score++;
-                                    Console.WriteLine("Player " + (m.player.number + 1) + " fell down a hole!");
+                                    if (!supressOutput && !Globals.supressAllOutput) Console.WriteLine("Player " + (m.player.number + 1) + " fell down a hole!");
                                 }
                                 else
                                 {
@@ -578,7 +618,7 @@ namespace Volt
                         m.player.score--;
                     }
                     PlayerToSpawn(m.player);
-                    Console.WriteLine("Player " + (m.player.number + 1) + " fell down a hole!");
+                    if (!supressOutput && !Globals.supressAllOutput) Console.WriteLine("Player " + (m.player.number + 1) + " fell down a hole!");
                     break;
                 }
                 else if (!IsOnBoard(checkLocation) || IsPlayerLocation(checkLocation))
@@ -637,6 +677,11 @@ namespace Volt
             //Array.Sort(round, delegate (Move x, Move y) { return x.rank - y.rank; });
             return round;
         }
+
+        public Coord GetPlayerLocation(int playerNumber)
+        {
+            return players[playerNumber].location;
+        }
     }
 
     class Coord
@@ -694,75 +739,99 @@ namespace Volt
             return new Coord(a.x + b.x, a.y + b.y);
         }
 
-        public static int manhattanDistance(Coord a, Coord b)
+        public static int ManhattanDistance(Coord a, Coord b)
         {
             return Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
+        }
+
+        public override string ToString()
+        {
+            return x + ", " + y;
         }
     }
 
     class Volt
     {
-        static void Main()
+        static void Main(string[] args)
         {
-            Player[] players = new Player[Globals.numPlayers];
-            for (int i = 0; i < Globals.numPlayers; i++)
+            if (args.Length > 0)
             {
-                players[i] = new Player(i, (i != 0 ? "computer" : "human"));
+                Globals.supressAllOutput = true;
             }
+            Player[] players = new Player[Globals.numPlayers];
+            //players = ParsePlayers(args);
 
-            Board board = new Board(players);
-
-            Node n = new Node(board, 0);
-            int count;
             for (int i = 0; i < Globals.numPlayers; i++)
             {
-                Console.WriteLine("Inital possible moves for player " + (i + 1));
-                count = 0;
-                foreach (Move m in n.possibleMoves[i])
+                if (args.Length == 0)
                 {
-                    Console.Write(count + ": ");
-                    m.Print();
-                    count++;
+                    players[i] = new Player(i, (i != 0 ? "mctsegreedy" : "human"));
+                }
+                else
+                {
+                    players[i] = new Player(i, "mcts" + args[i]);
                 }
             }
 
-            Console.WriteLine("");
+            Board board = new Board(players);
+            board.supressOutput = false;
 
-            n.RunMCTS(3);
+            /*Node n = new Node(board, 0);
+
+            long startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            n.RunMCTS(10000);
+            long endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            if (!Globals.supressAllOutput) Console.WriteLine("Elapsed time : " + (endTime-startTime));
+            */
 
 
-
-            /*
             PrintIntro();
 
             Move[,] programming = new Move[Globals.numPlayers, Globals.numMoves];
             Move[] temp = new Move[Globals.numMoves];
 
-            while (true)
+            int count = 0;
+            while (count <= Globals.maxTurns)
             {
                 board.Print();
                 for (int i = 0; i < Globals.numPlayers; i++)
                 {
-                    temp = players[i].MakeMove(board);
+                    temp = players[i].ChooseMove(board.Clone());
                     for (int j = 0; j < Globals.numMoves; j++)
                     {
                         programming[i, j] = temp[j];
                     }
                 }
-                Console.WriteLine("All programs locked in!");
+                if (!Globals.supressAllOutput) Console.WriteLine("All programs locked in!");
                 board.ExecuteMoves(programming);
+                count++;
+            }
+        }
 
-            }*/
+        static Player[] ParsePlayers(string[] args)
+        {
+            Console.WriteLine("in parseplayers");
+            Player[] players = new Player[Globals.numPlayers];
+
+            StreamReader s = File.OpenText("../../voltplayers.json");
+            string input = s.ReadToEnd();
+
+            dynamic result = JsonConvert.DeserializeObject(input);
+            string a = result.players[0].strategy.type;
+            Console.WriteLine(a);
+
+            Console.WriteLine("leaving parseplayers");
+            return players;
         }
 
         static void PrintIntro()
         {
-            Console.WriteLine("Welcome to Volt!");
-            Console.WriteLine("");
-            Console.WriteLine("During the programming phase type:");
-            Console.WriteLine("L, R, U or D followed by a number separated by a space to move that number of places left, right, up or down respectively.");
-            Console.WriteLine("N, NE, E, SE, S, SW, W, NW followed by HEAD (damage), BODY (push), LARM (45 deg ccw), RARM (45 deg cw), LLEG (90 deg ccw) or RLEG (90 deg cw) to shoot.");
-            Console.WriteLine("");
+            if (!Globals.supressAllOutput) Console.WriteLine("Welcome to Volt!");
+            if (!Globals.supressAllOutput) Console.WriteLine("");
+            if (!Globals.supressAllOutput) Console.WriteLine("During the programming phase type:");
+            if (!Globals.supressAllOutput) Console.WriteLine("L, R, U or D followed by a number separated by a space to move that number of places left, right, up or down respectively.");
+            if (!Globals.supressAllOutput) Console.WriteLine("N, NE, E, SE, S, SW, W, NW followed by HEAD (damage), BODY (push), LARM (45 deg ccw), RARM (45 deg cw), LLEG (90 deg ccw) or RLEG (90 deg cw) to shoot.");
+            if (!Globals.supressAllOutput) Console.WriteLine("");
         }
     }
 
@@ -815,11 +884,11 @@ namespace Volt
         {
             if (shoot)
             {
-                Console.WriteLine("Shooting " + dir + " at opponent's " + target);
+                if (!Globals.supressAllOutput) Console.WriteLine("Shooting " + dir + " at opponent's " + target);
             }
             else
             {
-                Console.WriteLine("Moving " + dir + " " + target + " spaces");
+                if (!Globals.supressAllOutput) Console.WriteLine("Moving " + dir + " " + target + " spaces");
             }
         }
 
@@ -904,8 +973,8 @@ namespace Volt
                 error = false;
                 do
                 {
-                    if (error) Console.WriteLine("Instruction was not valid!");
-                    Console.WriteLine("Please enter command #" + (i + 1));
+                    if (error && !Globals.supressAllOutput) Console.WriteLine("Instruction was not valid!");
+                    if (!Globals.supressAllOutput) Console.WriteLine("Please enter command #" + (i + 1));
                     line = Console.ReadLine().ToUpper();
                     error = true;
                 } while (!Move.IsValidInput(line));
@@ -921,13 +990,23 @@ namespace Volt
             int value;
             foreach (Coord cp in controlPoints)
             {
-                value = Coord.manhattanDistance(cp, location);
+                value = Coord.ManhattanDistance(cp, location);
                 if (value < lowest)
                 {
                     lowest = value;
                 }
             }
             return lowest;
+        }
+
+        public Move[] MCTSMove(Board board, String banditStrategy)
+        {
+            Move[] moves = new Move[Globals.numMoves];
+            Node n = new Node(board.Clone(), number, banditStrategy);
+            moves[0] = n.RunMCTS(Globals.MCTSLimit);
+            moves[0].player = this;
+            program = moves;
+            return moves;
         }
 
         public Move[] ComputerMove(Board board)
@@ -957,15 +1036,19 @@ namespace Volt
             return moves;
         }
 
-        public Move[] MakeMove(Board board)
+        public Move[] ChooseMove(Board board)
         {
-            Console.WriteLine("Player " + (number + 1) + "'s programming phase...");
+            if (!Globals.supressAllOutput) Console.WriteLine("Player " + (number + 1) + "'s programming phase...");
             switch (strategy)
             {
                 case "human":
                     return HumanMove(board);
                 case "computer":
                     return ComputerMove(board);
+                case "mctsucb":
+                    return MCTSMove(board, "ucb");
+                case "mctsegreedy":
+                    return MCTSMove(board, "egreedy");
             }
             return null;
         }
@@ -1003,11 +1086,12 @@ namespace Volt
         public int numPossibleMoves;
         public int[] moveScores;
         public int[] movePlays;
+        public string banditStrategy;
         public Random rnd = new Random();
 
         public bool isRoot = true;
 
-        public Node(Board board, int playerNumber)
+        public Node(Board board, int playerNumber, string banditStrategy)
         {
             this.board = board;
             this.possibleMoves = board.GetAllPlayersPossibleMoves();
@@ -1015,6 +1099,7 @@ namespace Volt
             this.moveScores = new int[numPossibleMoves];
             this.movePlays = new int[numPossibleMoves];
             this.playerNumber = playerNumber;
+            this.banditStrategy = banditStrategy;
             this.depth = 0;
         }
 
@@ -1042,30 +1127,58 @@ namespace Volt
                 //update average score in moveScores[index of random]
                 moveScores[i] += moveScore;
                 movePlays[i]++;
+                //if (!Globals.supressAllOutput) Console.WriteLine();
             }
 
             int idx;
-            while (totalPlays <= limit)
+            while (totalPlays < limit)
             {
-                idx = IdxFromUCB();
+                idx = IdxFromBanditStrategy();
 
                 Move m = (Move)possibleMoves[playerNumber][idx];
                 int moveScore = Playout(m);
                 totalPlays++;
                 moveScores[idx] += moveScore;
                 movePlays[idx]++;
+                //if (!Globals.supressAllOutput) Console.WriteLine();
             }
 
-            return (Move)possibleMoves[playerNumber][IdxFromUCB()];
+            /* For surface level analysis of move choice
+            for (int i = 0; i < numPossibleMoves; i++){
+                if (!Globals.supressAllOutput) Console.WriteLine("");
+                ((Move)possibleMoves[playerNumber][i]).Print();
+                if (!Globals.supressAllOutput) Console.WriteLine("scores: " + moveScores[i]);
+                if (!Globals.supressAllOutput) Console.WriteLine("plays: " + movePlays[i]);
+                if (!Globals.supressAllOutput) Console.WriteLine("score / plays = " + (float)((float)moveScores[i] / (float)movePlays[i]) + (GetBestMove() == i ? " ***BEST*** " : ""));
+            }
+            */
+
+            return ((Move)possibleMoves[playerNumber][GetBestMove()]).Clone();
         }
 
-        int IdxFromUCB(){
+        int IdxFromBanditStrategy()
+        {
+            switch (banditStrategy)
+            {
+                case "ucb":
+                    return IdxFromUCB();
+                case "egreedy":
+                    return IdxFromEpsilonGreedy();
+                default:
+                    return -1;
+            }
+        }
+
+        int IdxFromUCB()
+        {
             double bestUCB = double.MinValue;
             int bestUCBIdx = 0;
             double UCB;
-            for (int i = 0; i < numPossibleMoves; i++){
-                UCB = moveScores[i] + tuneableParam * Math.Sqrt( Math.Log( totalPlays ) / movePlays[i] );
-                if (UCB > bestUCB){
+            for (int i = 0; i < numPossibleMoves; i++)
+            {
+                UCB = moveScores[i] + tuneableParam * Math.Sqrt(Math.Log(totalPlays) / movePlays[i]);
+                if (UCB > bestUCB)
+                {
                     bestUCB = UCB;
                     bestUCBIdx = i;
                 }
@@ -1073,7 +1186,8 @@ namespace Volt
             return bestUCBIdx;
         }
 
-        int IdxFromEpsilonGreedy(){
+        int IdxFromEpsilonGreedy()
+        {
             if (rnd.NextDouble() < Globals.epsilon)
             {
                 return rnd.Next(numPossibleMoves);
@@ -1086,12 +1200,12 @@ namespace Volt
 
         int GetBestMove()
         {
-            int bestAvgScore = int.MinValue;
+            float bestAvgScore = float.MinValue;
             int bestIdx = 0;
-            int moveScore;
+            float moveScore;
             for (int i = 0; i < numPossibleMoves; i++)
             {
-                moveScore = moveScores[i] / movePlays[i];
+                moveScore = (float)moveScores[i] / (float)movePlays[i];
                 if (moveScore > bestAvgScore)
                 {
                     bestAvgScore = moveScore;
@@ -1103,7 +1217,7 @@ namespace Volt
 
         public int Playout(Move m)
         {
-            if (depth <= maxDepth)
+            if (depth < maxDepth)
             {
                 Node child = MakeMoveWithRandomRound(m);
                 return child.Playout();
@@ -1116,7 +1230,7 @@ namespace Volt
 
         public int Playout()
         {
-            if (depth <= maxDepth)
+            if (depth < maxDepth)
             {
                 Node child = RandomRound();
                 return child.Playout();
@@ -1130,8 +1244,7 @@ namespace Volt
         public Move PlayerMoveFromIdx(int idx)
         {
             Move m = (Move)possibleMoves[playerNumber][idx];
-            Console.Write("getting move from idx : ");
-            m.Print();
+
             return m;
         }
 
@@ -1143,10 +1256,8 @@ namespace Volt
                 bool shoot = rnd.Next(3) == 0; // 33% chance
                 do
                 {
-                    moves[i] = (Move)possibleMoves[i][rnd.Next(possibleMoves[i].Count)];
+                    moves[i] = ((Move)possibleMoves[i][rnd.Next(possibleMoves[i].Count)]).Clone();
                 } while (moves[i].shoot != shoot);
-                //Console.Write("(random) Player " + (i + 1) + " is: ");
-                moves[i].Print();
             }
             return moves;
         }
@@ -1154,7 +1265,7 @@ namespace Volt
         public Node MakeMoveWithRandomRound(Move m)
         {
             Move[] round = GetRandomMoves();
-            round[playerNumber] = m;
+            round[playerNumber] = m.Clone();
 
             Board nextBoard = board.Clone();
             nextBoard.ExecuteMoves(round);
@@ -1165,16 +1276,11 @@ namespace Volt
 
         public Node RandomRound()
         {
-            
+
             Move[] round = GetRandomMoves();
 
             Board nextBoard = board.Clone();
 
-            /*
-            Board nextBoard = board.Clone();
-            possibleMoves = nextBoard.GetAllPlayersPossibleMoves();
-            Move[] round = GetRandomMoves();
-            */
             nextBoard.ExecuteMoves(round);
 
             Node nextNode = new Node(nextBoard, this);
@@ -1183,11 +1289,9 @@ namespace Volt
 
         public int EvaluateLeaf()
         {
-            //games++;
-            int newScore = 5;   //evalBoard
-            //score = newScore / games;
+            Evaluator e = new Evaluator("manhattan");
+            int newScore = e.Evaluate(board, playerNumber);
             return newScore;
-            //BackPropagate(score, games);
         }
 
         public void BackPropagate(int score, int games)
@@ -1201,7 +1305,37 @@ namespace Volt
         }
     }
 
-    class Evaluator {
-        
+    class Evaluator
+    {
+        String strategy;
+        public Evaluator(String strategy)
+        {
+            this.strategy = strategy;
+        }
+        public int Evaluate(Board board, int playerNum)
+        {
+            switch (strategy)
+            {
+                case "manhattan":
+                    int result = DistToControlPoint(board.GetPlayerLocation(playerNum), board.controlLocations);
+                    return result;
+            }
+            throw new Exception();
+        }
+        int DistToControlPoint(Coord playerLocation, Coord[] controlPoints)
+        {
+            int lowest = int.MaxValue;
+            int value;
+            foreach (Coord cp in controlPoints)
+            {
+                value = Coord.ManhattanDistance(cp, playerLocation);
+                if (value < lowest)
+                {
+                    lowest = value;
+                }
+            }
+            if (lowest == 0) return (int)Math.Round(1.5 * (float)(Globals.width + Globals.height));
+            return (Globals.width + Globals.height) - lowest;
+        }
     }
 }
