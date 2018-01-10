@@ -41,6 +41,13 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Board.cs" />
+    <Compile Include="Coord.cs" />
+    <Compile Include="Volt.cs" />
+    <Compile Include="Move.cs" />
+    <Compile Include="Player.cs" />
+    <Compile Include="Node.cs" />
+    <Compile Include="Evaluator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
